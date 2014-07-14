@@ -6,3 +6,9 @@
 	path = drake
 	url = https://github.com/RobotLocomotion/drake.git
 	branch = master
+[submodule "bullet"]
+	path = bullet
+	url = https://github.com/RobotLocomotion/bullet-pod
+[submodule "eigen"]
+	path = eigen
+	url = https://github.com/RobotLocomotion/eigen-pod
