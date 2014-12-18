@@ -62,14 +62,13 @@ idxB = ball;
 [x_ball, J_ball, ~] = obj.forwardKin(kinsol, ball, [0; 0; 8]);
 normal = (x_link - x_ball);
 n_hat = normal / norm(normal);
-% n_hat = normal;
 % d(n_hat) / dn = (I*dim(n) - n * n_hat') / norm(n)^2
 dn_hat = (eye(size(normal, 1))*size(normal, 1) - normal * n_hat') / norm(normal)^2;
 % d(n_hat) / dq = d(n_hat) / dn * dn/dq
 dn = dn_hat * (J_link - J_ball);
 phi = norm(x_link - x_ball) - radius;
 xA = [0; 0; 3];
-xB = radius * n_hat + [0; 0; 8];
+xB = radius * n_hat;
 normal = n_hat;
 %
 %

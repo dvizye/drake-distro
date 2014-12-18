@@ -5,6 +5,8 @@ function addpath_drake
 % directing you to their location.
 %
 
+%[dzy] Add snopt to path
+addpath('/Users/dzy/drake-rigid-body/drake-distro/snopt/matlab')
 root = pwd;
 
 if ~exist('pods_get_base_path','file')

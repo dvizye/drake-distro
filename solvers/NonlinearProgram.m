@@ -1281,7 +1281,10 @@ classdef NonlinearProgram
         num_rows_G = 1+obj.num_ceq+obj.num_cin+length(obj.beq)+length(obj.bin);
         [f,G] = snopt_userfun(x_free);
         [~,G_numerical] = geval(@snopt_userfun,x_free,struct('grad_method','numerical'));
+        % [dzy] don't know why this needs dimensions to be reshaped, but
+        % it's different than G_numerical
         G_user = full(sparse(iGfun_free,jGvar_free,G,num_rows_G,num_x_free));
+%         G_user = G;
         G_err = G_user-G_numerical;
         [max_err,max_err_idx] = max(abs(G_err(:)));
         [max_err_row,max_err_col] = ind2sub([num_rows_G,obj.num_vars],max_err_idx);

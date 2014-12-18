@@ -11,9 +11,6 @@ classdef ContactImplicitTrajectoryOptimization < DirectTrajectoryOptimization
     jl_lb_ind  % joint indices where the lower bound is finite
     jl_ub_ind % joint indices where the lower bound is finite
     nJL % number of joint limits = length([jl_lb_ind;jl_ub_ind])
-    
-    nonlincompl_constraints
-    nonlincompl_slack_inds
   end
   
   properties (Constant)
@@ -49,7 +46,7 @@ classdef ContactImplicitTrajectoryOptimization < DirectTrajectoryOptimization
         options.lambda_jl_mult = 1;
       end
       if ~isfield(options,'active_collision_options')
-        options.active_collision_options.terrain_only = true;
+        options.active_collision_options.terrain_only = false;
       end
       if ~isfield(options,'integration_method')
         options.integration_method = ContactImplicitTrajectoryOptimization.MIDPOINT;
@@ -67,8 +64,7 @@ classdef ContactImplicitTrajectoryOptimization < DirectTrajectoryOptimization
       
       constraints = cell(N-1,1);
       lincompl_constraints = cell(N-1,1);
-      obj.nonlincompl_constraints = cell(N-1,1);
-      obj.nonlincompl_slack_inds = cell(N-1,1);
+      nonlincompl_constraints = cell(N-1,1);
       jlcompl_constraints = cell(N-1,1);
       dyn_inds = cell(N-1,1);      
       
@@ -77,7 +73,7 @@ classdef ContactImplicitTrajectoryOptimization < DirectTrajectoryOptimization
       
       [~,~,~,~,~,~,~,mu] = obj.plant.contactConstraints(zeros(nq,1),false,obj.options.active_collision_options);
       
-      for i=1:obj.N-1,
+      for i=1:obj.N-1,        
 %         dyn_inds{i} = [obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i);obj.l_inds(:,i);obj.ljl_inds(:,i)];
         dyn_inds{i} = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i);obj.l_inds(:,i);obj.ljl_inds(:,i)};
         constraints{i} = cnstr;
@@ -91,10 +87,9 @@ classdef ContactImplicitTrajectoryOptimization < DirectTrajectoryOptimization
           % lambda_f
           lambda_inds = obj.l_inds(repmat((1:1+obj.nD)',obj.nC,1) + kron((0:obj.nC-1)',(2+obj.nD)*ones(obj.nD+1,1)),i);
           
+          nonlincompl_constraints{i} = NonlinearComplementarityConstraint(@nonlincompl_fun,nX + obj.nC,obj.nC*(1+obj.nD),obj.options.nlcc_mode,obj.options.compl_slack);
           
-          obj.nonlincompl_constraints{i} = NonlinearComplementarityConstraint(@nonlincompl_fun,nX + obj.nC,obj.nC*(1+obj.nD),obj.options.nlcc_mode,obj.options.compl_slack);
-          obj.nonlincompl_slack_inds{i} = obj.num_vars+1:obj.num_vars + obj.nonlincompl_constraints{i}.n_slack;          
-          obj = obj.addConstraint(obj.nonlincompl_constraints{i},[obj.x_inds(:,i+1);gamma_inds;lambda_inds]);
+          obj = obj.addConstraint(nonlincompl_constraints{i},[obj.x_inds(:,i+1);gamma_inds;lambda_inds]);
           
           % linear complementarity constraint
           %   gamma /perp mu*lambda_N - sum(lambda_fi)
@@ -125,10 +120,76 @@ classdef ContactImplicitTrajectoryOptimization < DirectTrajectoryOptimization
         end
       end
       
+%       function [f,df] = dynamics_constraint_fun(h,x0,x1,u,lambda,lambda_jl)
+%         nv = obj.plant.getNumVelocities;
+%         nu = obj.plant.getNumInputs;
+%         nl = length(lambda);
+%         njl = length(lambda_jl);
+% 
+%         lambda = lambda*obj.options.lambda_mult;
+%         lambda_jl = lambda_jl*obj.options.lambda_jl_mult;
+%         
+%         assert(nq == nv) % not quite ready for the alternative
+%         
+%         q0 = x0(1:nq);
+%         v0 = x0(nq+1:nq+nv);
+%         q1 = x1(1:nq);
+%         v1 = x1(nq+1:nq+nv);
+%         
+%         [H,C,B,dH,dC,dB] = obj.plant.manipulatorDynamics(q1,v1);
+%         
+%         % q1 = q0 + h*v1
+%         fq = q1 - q0 - h*v1;
+%         dfq = [-v1, -eye(nq), zeros(nq,nv), eye(nq), -h*eye(nq) zeros(nq,nu+nl+njl)];
+% 
+%         if nu>0, 
+%           BuminusC = B*u-C; 
+%           dBuminusC = matGradMult(dB,u) - dC;
+%         else
+%           BuminusC = -C;
+%           dBuminusC = -dC;
+%         end
+%         
+%         % H*v1 = H*v0 + h*(B*u - C) + n^T lambda_N + d^T * lambda_f
+%         fv = H*(v1 - v0) - h*BuminusC;
+%         % [h q0 v0 q1 v1 u l ljl]
+%         dfv = [-BuminusC, zeros(nv,nq), -H, zeros(nv,nq), H, -h*B, zeros(nv,nl+njl)] + ...
+%           [zeros(nv,1+nq+nv) matGradMult(dH,v1-v0)-h*dBuminusC zeros(nv,nu+nl+njl)];
+%         
+%         if nl>0
+%           [phi,~,~,~,~,~,~,~,n,D,dn,dD] = obj.plant.contactConstraints(q1,false,obj.options.active_collision_options);
+%           % construct J and dJ from n,D,dn, and dD so they relate to the
+%           % lambda vector
+%           J = zeros(nl,nq);
+%           J(1:2+obj.nD:end,:) = n;
+%           dJ = zeros(nl*nq,nq);
+%           dJ(1:2+obj.nD:end,:) = dn;
+%           
+%           for j=1:length(D),
+%             J(1+j:2+obj.nD:end,:) = D{j};
+%             dJ(1+j:2+obj.nD:end,:) = dD{j};
+%           end
+% 
+%           fv = fv - J'*lambda;
+%           dfv(:,2+nq+nv:1+2*nq+nv) = dfv(:,2+nq+nv:1+2*nq+nv) - matGradMult(dJ,lambda,true);
+%           dfv(:,2+2*nq+2*nv+nu:1+2*nq+2*nv+nu+nl) = -J'*obj.options.lambda_mult;
+%         end
+%         
+%         if njl>0
+%           [~,J_jl] = jointLimitConstraints(obj.plant,q1);
+%           
+%           fv = fv - J_jl'*lambda_jl;
+%           dfv(:,2+2*nq+2*nv+nu+nl:1+2*nq+2*nv+nu+nl+njl) = -J_jl'*obj.options.lambda_jl_mult;
+%         end
+%         
+%         f = [fq;fv];
+%         df = [dfq;dfv];
+%       end
+      
       % nonlinear complementarity constraints:
       %   lambda_N /perp phi(q)
       %   lambda_fi /perp gamma + Di*psi(q,v)
-      % x = [q;v;gamma]
+      % y = [q;v;gamma]
       % z = [lambda_N;lambda_F1;lambda_f2] (each contact sequentially)
       function [f,df] = nonlincompl_fun(y)
         nq = obj.plant.getNumPositions;
@@ -209,6 +270,22 @@ classdef ContactImplicitTrajectoryOptimization < DirectTrajectoryOptimization
           dBuminusC1 = -dC1;
         end
         
+        [phi,~,~,~,~,~,~,~,n,D,dn,dD] = obj.plant.contactConstraints(q1,false,struct('terrain_only',false));
+        % construct J and dJ from n,D,dn, and dD so they relate to the
+        % lambda vector
+        J = zeros(nl,nq);
+        J(1:2+obj.nD:end,:) = n;
+        dJ = zeros(nl*nq,nq);
+        dJ(1:2+obj.nD:end,:) = dn;
+        
+        for j=1:length(D),
+          J(1+j:2+obj.nD:end,:) = D{j};
+          dJ(1+j:2+obj.nD:end,:) = dD{j};
+        end
+        
+        [~,J_jl] = jointLimitConstraints(obj.plant,q1);
+        
+        
         switch obj.options.integration_method
           case ContactImplicitTrajectoryOptimization.MIDPOINT
             % q1 = q0 + h*v1
@@ -236,7 +313,7 @@ classdef ContactImplicitTrajectoryOptimization < DirectTrajectoryOptimization
           [zeros(nv,1) matGradMult(dH0,v1-v0)-h*dBuminusC0 matGradMult(dH1,v1-v0)-h*dBuminusC1 zeros(nv,nu+nl+njl)];
         
         if nl>0
-          [phi,normal,~,~,~,~,~,~,n,D,dn,dD] = obj.plant.contactConstraints(q1,false,obj.options.active_collision_options);
+          [phi,~,~,~,~,~,~,~,n,D,dn,dD] = obj.plant.contactConstraints(q1,false,obj.options.active_collision_options);
           % construct J and dJ from n,D,dn, and dD so they relate to the
           % lambda vector
           J = zeros(nl,nq);
@@ -357,18 +434,8 @@ classdef ContactImplicitTrajectoryOptimization < DirectTrajectoryOptimization
           z0(obj.ljl_inds) = 0;
         end
       end
-            
-      if obj.nC > 0
-        for i=1:obj.N-1,
-          gamma_inds = obj.l_inds(obj.nD+2:obj.nD+2:end,i);
-          lambda_inds = obj.l_inds(repmat((1:1+obj.nD)',obj.nC,1) + kron((0:obj.nC-1)',(2+obj.nD)*ones(obj.nD+1,1)),i);          
-          if ~isempty(obj.nonlincompl_slack_inds{i})
-            z0(obj.nonlincompl_slack_inds{i}) = obj.nonlincompl_constraints{i}.slack_fun(z0([obj.x_inds(:,i+1);gamma_inds;lambda_inds]));
-          end
-        end
-      end
     end
-      
+    
     function obj = addRunningCost(obj,running_cost_function)
       nX = obj.plant.getNumStates();
       nU = obj.plant.getNumInputs();

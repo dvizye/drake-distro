@@ -21,7 +21,7 @@ function [phi,normal,d,xA,xB,idxA,idxB,mu,n,D,dn,dD] = contactConstraints(obj,ki
 % @retval D {k}(m x n) friction cone basis in joint coordinates, for k directions
 % @retval dn (mn x n) dn/dq derivative
 % @retval dD {k}(mn x n) dD/dq derivative
-user_defined_gap = true;
+
 compute_first_derivative = nargout > 8;
 compute_second_derivative = nargout > 10;
 
@@ -38,13 +38,7 @@ if ~isstruct(kinsol)
   kinsol = doKinematics(obj,kinsol,compute_second_derivative);
 end
 
-if user_defined_gap
-    [phi,normal,xA,xB,idxA,idxB, dn] = collisionDetect(obj,kinsol,allow_multiple_contacts,active_collision_options);
-    [phib,normalb,xAb,xBb,idxAb,idxBb] = collisionDetectBullet(obj,kinsol,allow_multiple_contacts,active_collision_options);
-else
-    [phi,normal,xA,xB,idxA,idxB] = collisionDetectBullet(obj,kinsol,allow_multiple_contacts,active_collision_options);
-end
-
+[phi,normal,xA,xB,idxA,idxB, dn] = collisionDetect(obj,kinsol,allow_multiple_contacts,active_collision_options);
 idxA = idxA';
 idxB = idxB';
 nC = numel(phi);
@@ -64,14 +58,10 @@ end
 mu = ones(nC,1);
 
 d = obj.surfaceTangents(normal);
-% [dzy] remove friction cone
-d = [];
 
 % [dzy] Compute deriv of normal w/ respect to q
 if compute_second_derivative
     dd = obj.surfaceTangents(dn);
-    % [dzy] remove friction cone
-    dd = [];
 end
 
 if compute_first_derivative
@@ -169,7 +159,7 @@ if compute_first_derivative
     end
   end
 
-% [dzy] TODO: this also assumes normal doesn't change, replace with dn from
+% [dzy] this also assumes normal doesn't change, replace with dn from
 % collisionDetect
   if compute_second_derivative
 %     dn

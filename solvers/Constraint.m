@@ -116,12 +116,14 @@ classdef Constraint
       else
         % special casing 'user' to avoid geval for speed reasons
         varargout=cell(1,max(nargout,1));
-        if (isempty(obj.grad_method) && nargout<=obj.grad_level+1) ...
-            || strcmp(obj.grad_method,'user')
-          [varargout{:}] = obj.constraintEval(varargin{:});
-        else
-          [varargout{:}] = geval(@obj.constraintEval,varargin{:},struct('grad_method',obj.grad_method,'grad_level',obj.grad_level));
-        end
+%         if (isempty(obj.grad_method) && nargout<=obj.grad_level+1) ...
+%             || strcmp(obj.grad_method,'user')
+%           [varargout{:}] = obj.constraintEval(varargin{:});
+%         else
+%           [varargout{:}] = geval(@obj.constraintEval,varargin{:},struct('grad_method',obj.grad_method,'grad_level',obj.grad_level));
+%         end
+        % Switch everything over to numerical
+        [varargout{:}] = geval(@obj.constraintEval,varargin{:},struct('grad_method','numerical','grad_level',obj.grad_level));
       end
     end
     

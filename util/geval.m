@@ -54,7 +54,9 @@ end
 
 varargout=cell(1,nargout);
 
-method = 12; % user if possible, otherwise taylorvar
+%[dzy]
+% method = 12; % user if possible, otherwise taylorvar
+method = 13;
 grad_level = -1;
 if (isstruct(varargin{end}))
   options=varargin{end};
@@ -93,7 +95,8 @@ if (isstruct(varargin{end}))
       case 'symbolic'
         method=4;
       case {'','user_then_taylorvar'}
-        method=12;
+        % [dzy] don't want to use taylor, use numerical instead
+        method=13;
       case 'user_then_numerical'
         method=13;
       otherwise
@@ -141,6 +144,8 @@ end
 
 order=ceil(nargout/p)-1;
 
+% [dzy] use numerical for everything 
+method = 3;
 switch (method)
   case 1  % user
     [varargout{:}]=feval(fun,varargin{:});

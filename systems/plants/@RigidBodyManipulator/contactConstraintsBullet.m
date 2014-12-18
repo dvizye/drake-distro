@@ -1,4 +1,4 @@
-function [phi,normal,d,xA,xB,idxA,idxB,mu,n,D,dn,dD] = contactConstraints(obj,kinsol,allow_multiple_contacts,active_collision_options)
+function [phi,normal,d,xA,xB,idxA,idxB,mu,n,D,dn,dD] = contactConstraintsBullet(obj,kinsol,allow_multiple_contacts,active_collision_options)
 % function [phi,xA,xB,idxA,idxB,n,D,mu,dn,dD] = contactConstraints(obj,kinsol,body_idx)
 % Compute the contact constraints for a manipulator, and relevent bases.
 % The contact frame always points from body B to body A.
@@ -21,7 +21,7 @@ function [phi,normal,d,xA,xB,idxA,idxB,mu,n,D,dn,dD] = contactConstraints(obj,ki
 % @retval D {k}(m x n) friction cone basis in joint coordinates, for k directions
 % @retval dn (mn x n) dn/dq derivative
 % @retval dD {k}(mn x n) dD/dq derivative
-user_defined_gap = true;
+
 compute_first_derivative = nargout > 8;
 compute_second_derivative = nargout > 10;
 
@@ -38,13 +38,7 @@ if ~isstruct(kinsol)
   kinsol = doKinematics(obj,kinsol,compute_second_derivative);
 end
 
-if user_defined_gap
-    [phi,normal,xA,xB,idxA,idxB, dn] = collisionDetect(obj,kinsol,allow_multiple_contacts,active_collision_options);
-    [phib,normalb,xAb,xBb,idxAb,idxBb] = collisionDetectBullet(obj,kinsol,allow_multiple_contacts,active_collision_options);
-else
-    [phi,normal,xA,xB,idxA,idxB] = collisionDetectBullet(obj,kinsol,allow_multiple_contacts,active_collision_options);
-end
-
+[phi,normal,xA,xB,idxA,idxB] = collisionDetectBullet(obj,kinsol,allow_multiple_contacts,active_collision_options);
 idxA = idxA';
 idxB = idxB';
 nC = numel(phi);
@@ -64,23 +58,13 @@ end
 mu = ones(nC,1);
 
 d = obj.surfaceTangents(normal);
-% [dzy] remove friction cone
-d = [];
-
-% [dzy] Compute deriv of normal w/ respect to q
-if compute_second_derivative
-    dd = obj.surfaceTangents(dn);
-    % [dzy] remove friction cone
-    dd = [];
-end
-
 if compute_first_derivative
   nq = obj.getNumPositions;  
   nk = size(d,2);
   
   J = zeros(3*nC,nq)*kinsol.q(1);
   if compute_second_derivative,
-    dJ = zeros(3*nC,nq*nq)*kinsol.q(1);
+    dJ = zeros(3*nC,nq*nq)*kinsol.q(1);;
   end
   
 %   assert(isequal(idxA,sort(idxA)))
@@ -158,8 +142,7 @@ if compute_first_derivative
     D{k} = sparse(indmat,1:3*nC,d{k}(:))*J;
     if compute_second_derivative
       % note: this temporarily assumes that the normal does not change with contact_pos
-      dd_tmp = dd{k}';
-      dD{k} = sparse(reshape(sparse(indmat,1:3*nC,d{k}(:))*dJ,numel(n),nq) + sparse(dd_tmp)*J);
+      dD{k} = reshape(sparse(indmat,1:3*nC,d{k}(:))*dJ,numel(n),nq);
     end
   end
   for k=(nk+1):2*nk
@@ -168,11 +151,8 @@ if compute_first_derivative
       dD{k} = -dD{k-nk};
     end
   end
-
-% [dzy] TODO: this also assumes normal doesn't change, replace with dn from
-% collisionDetect
+  
   if compute_second_derivative
-%     dn
     dn = reshape(sparse(indmat,1:3*nC,normal(:))*dJ,numel(n),nq);
   end
 end

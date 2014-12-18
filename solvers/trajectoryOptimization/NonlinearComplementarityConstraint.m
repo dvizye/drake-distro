@@ -35,20 +35,22 @@ classdef NonlinearComplementarityConstraint < CompositeConstraint
       end
 
       n = 0;
+      % [dzy] changed all of FunctionHandleConstraints to calc gradients
+      % w/o user-defined fn
       switch mode
         case 1
           constraints{1} = BoundingBoxConstraint([-inf(xdim,1);zeros(zdim,1)],inf(zdim+xdim,1));
-          constraints{2} = FunctionHandleConstraint(zeros(zdim,1),inf(zdim,1),xdim+zdim,fun);
-          constraints{3} = FunctionHandleConstraint(zeros(zdim,1),zeros(zdim,1)+slack,xdim+zdim,@prodfun);
+          constraints{2} = FunctionHandleConstraint(zeros(zdim,1),inf(zdim,1),xdim+zdim,fun, 0);
+          constraints{3} = FunctionHandleConstraint(zeros(zdim,1),zeros(zdim,1)+slack,xdim+zdim,@prodfun, 0);
         case 2
           constraints{1} = BoundingBoxConstraint([-inf(xdim,1);zeros(2*zdim,1)],inf(2*zdim+xdim,1));
-          constraints{2} = FunctionHandleConstraint(zeros(zdim,1),zeros(zdim,1),xdim+2*zdim,@slackeq);
-          constraints{3} = FunctionHandleConstraint(zeros(zdim,1),zeros(zdim,1)+slack,xdim+2*zdim,@slackprod);
+          constraints{2} = FunctionHandleConstraint(zeros(zdim,1),zeros(zdim,1),xdim+2*zdim,@slackeq, 0);
+          constraints{3} = FunctionHandleConstraint(zeros(zdim,1),zeros(zdim,1)+slack,xdim+2*zdim,@slackprod, 0);
           n = zdim;
         case 3
-          constraints = FunctionHandleConstraint(zeros(zdim,1),zeros(zdim,1),xdim+zdim,@fbfun);
+          constraints = FunctionHandleConstraint(zeros(zdim,1),zeros(zdim,1),xdim+zdim,@fbfun, 0);
         case 4
-          constraints = FunctionHandleConstraint(zeros(zdim,1),zeros(zdim,1),xdim+zdim,@proxfun);
+          constraints = FunctionHandleConstraint(zeros(zdim,1),zeros(zdim,1),xdim+zdim,@proxfun, 0);
       end
       function [f,df] = prodfun(y)
         z = y(xdim+1:xdim+zdim);

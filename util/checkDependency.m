@@ -12,6 +12,7 @@ ldep = lower(dep);
 conf_var = [ldep,'_enabled'];
 
 already_checked = isfield(conf,conf_var) && ~isempty(conf.(conf_var));
+% [dzy] if false
 if already_checked
   ok = conf.(conf_var);
 else % then try to evaluate the dependency now...
